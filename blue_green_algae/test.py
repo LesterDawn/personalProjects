@@ -39,7 +39,7 @@ def pca_data(data):
 #     report_total.to_file('./report_total.html')
 
 
-def correlation(data):
+def correlation(data):  # get corr of features
     temp = preprocessing.scale(data)
     data_scaled = pd.DataFrame(preprocessing.scale(data), columns=data.columns)
     return data_scaled.corr(method="pearson")

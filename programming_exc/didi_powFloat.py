@@ -24,3 +24,5 @@ while True:
         print(pow_R)
     except:
         break
+
+

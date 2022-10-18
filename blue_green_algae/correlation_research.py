@@ -6,6 +6,9 @@ from sklearn import preprocessing
 import scipy.signal
 import matplotlib.pyplot as plt
 import os
+from warnings import simplefilter
+
+simplefilter(action="ignore", category=FutureWarning)
 
 pd.set_option('display.max_columns', 1000)
 

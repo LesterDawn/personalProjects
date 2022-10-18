@@ -46,12 +46,17 @@ def correlation(data):  # get corr of features
 
 
 def concat_csv(f1, f2, directory):
-    file1 = pd.read_csv(directory + 'raw_data/' + f1, index_col=None)
-    file2 = pd.read_csv(directory + 'raw_data/' + f2, index_col=None)
+    file1 = pd.read_csv(directory + f1, index_col=None)
+    file2 = pd.read_csv(directory + f2, index_col=None)
     file = [file1, file2]
-    drop_list = ['salinity', 'ammonia nitrogen', 'dissolved oxygen (%Sat)', 'PH value (mv)']
-    train = pd.concat(file).drop(drop_list, axis=1)
-    train.to_csv(directory + "d-" + f1.split('-')[2], index=False, sep=',')
+    # drop_list = ['salinity', 'ammonia nitrogen', 'dissolved oxygen (%Sat)', 'PH value (mv)']
+    train = pd.concat(file)  # .drop(drop_list, axis=1)
+    if f1.__contains__('独墅湖'):
+        print(directory + "监测数据-独墅-" + f1.split('-')[2])
+        train.to_csv(directory + "监测数据-独墅-" + f1.split('-')[2], index=False, encoding='utf_8_sig')
+    elif f1.__contains__('金鸡湖'):
+        print(directory + "监测数据-金鸡-" + f1.split('-')[2])
+        train.to_csv(directory + "监测数据-金鸡-" + f1.split('-')[2], index=False, encoding='utf_8_sig')
 
 
 def merge_data(directory: str):
@@ -59,16 +64,35 @@ def merge_data(directory: str):
     # merged data: ./dataset/jinji_lake
     inside = []
     outside = []
-    for file in os.listdir(directory + 'raw_data/'):
-        if file.__contains__('inside'):
+    for file in os.listdir(directory):
+        if file.__contains__('内湖'):
             inside.append(file)
-        elif file.__contains__('outside'):
+        elif file.__contains__('外湖'):
             outside.append(file)
     for i in inside:
         for o in outside:
             if o.split('-')[2] == i.split('-')[2]:
+                inside.remove(i)
+                outside.remove(o)
                 concat_csv(i, o, directory)
                 break
+    for i in inside:
+        df = pd.read_csv(directory + i, index_col=None)
+        if i.__contains__('独墅湖'):
+            print(directory + "监测数据-独墅-" + i.split('-')[2])
+            df.to_csv(directory + "监测数据-独墅-" + i.split('-')[2], index=False, encoding='utf_8_sig')
+        elif i.__contains__('金鸡湖'):
+            print(directory + "监测数据-金鸡-" + i.split('-')[2])
+            df.to_csv(directory + "监测数据-金鸡-" + i.split('-')[2], index=False, encoding='utf_8_sig')
+
+    for i in outside:
+        df = pd.read_csv(directory + i, index_col=None)
+        if i.__contains__('独墅湖'):
+            print(directory + "监测数据-独墅-" + i.split('-')[2])
+            df.to_csv(directory + "监测数据-独墅-" + i.split('-')[2], index=False, encoding='utf_8_sig')
+        elif i.__contains__('金鸡湖'):
+            print(directory + "监测数据-金鸡-" + i.split('-')[2])
+            df.to_csv(directory + "监测数据-金鸡-" + i.split('-')[2], index=False, encoding='utf_8_sig')
 
 
 def daily_exploring(directory: str):
@@ -117,10 +141,48 @@ def norm_test_all(directory: str):
     res.to_csv(directory + "j-" + "NormTest.csv", index=False, sep=',')
 
 
-file_dir = "./datasets/dushu_jinji_lake/"
+def create_export_name(file_dir, file_name):
+    export_name = ''
+    date = file_name.split('-')[2]
+    if file_name.__contains__('d-inside'):
+        export_name = '监测数据-独墅湖内湖-'
+    elif file_name.__contains__('d-outside'):
+        export_name = '监测数据-独墅湖外湖-'
+    elif file_name.__contains__('j-outside'):
+        export_name = '监测数据-金鸡湖外湖-'
+    elif file_name.__contains__('j-inside'):
+        export_name = '监测数据-金鸡湖内湖-'
+
+    return file_dir + export_name + date.split('.')[0] + '.csv'
+
+
+def change_name(file_dir):
+    for file in os.listdir(file_dir):
+        df = pd.read_csv(file_dir + file)
+        df.rename(
+            columns={'longitude': '经度', 'latitude': '纬度', 'time': '时间', 'chlorophyll': '叶绿素', 'conductivity': '电导率',
+                     'low frequency water depth (m)': '低频水深(m)', 'dissolved oxygen (%Sat)': '溶解氧(% Sat)',
+                     'dissolved oxygen(mg/L)': '溶解氧(mg/L)', 'ammonia nitrogen': '氨氮值', 'salinity': '盐度',
+                     'phycoprotein': '藻蛋白', 'total dissolved solids': '总溶解固体', 'turbidity': '浊度',
+                     'temperature': '温度', 'PH value': 'PH值', 'PH value (mv)': 'PH值(mv)'}, inplace=True)
+        save_name = create_export_name(file_dir, file)
+        df.to_csv(save_name, index=False, encoding='utf_8_sig')
+
+
 # merge_data(file_dir)
 # dataset = load_data(file_dir)
 # dataset = dataset.fillna(dataset.interpolate()).drop('time', axis=1)
-daily_exploring(file_dir)
+# daily_exploring(file_dir)
 # corr = correlation(dataset.drop('time', axis=1))
 # norm_test_all(file_dir)
+# change_name(file_dir)
+
+
+attrs = ['longitude', 'latitude', 'time', 'chlorophyll', 'conductivity', 'low frequency water depth (m)',
+         'dissolved oxygen (%Sat)',
+         'dissolved oxygen(mg/L)', 'ammonia nitrogen', 'salinity', 'phycoprotein', 'total dissolved solids',
+         'turbidity', 'temperature',
+         'PH value,PH value (mv)']
+
+file_dir = "./datasets/监测数据/"
+merge_data(file_dir)

@@ -26,5 +26,4 @@ def LCS(s1: str, s2: str) -> str:
 
 s1 = "1a1a31"
 s2 = "1a231"
-
 print(LCS(s1, s2))

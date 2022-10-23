@@ -1,28 +1,20 @@
 def LCS(s1: str, s2: str) -> str:
     # write code here
     res = ''
-    start, curr = 0, 0
     n1, n2 = len(s1), len(s2)
-    s1, s2 = s1 if n1 >= n2 else s2, s2 if n1 >= n2 else s1
-    n1, n2 = len(s1), len(s2)
-    while True:
-        if curr == n1:
-            break
-
-        start = min(start, n2 - 1)
-        end = min(n1, curr + 1)
-        s2_curr = min(curr, n2 - 1)
-        if s1[curr] in s2[start:end]:
-            res += s1[curr]
-            start = curr
-        elif s2[s2_curr] in s1[start:curr + 1]:
-            res += s2[s2_curr]
-            start = curr
-        if s2[s2_curr] == s1[curr]:
-            start = curr + 1
-        curr += 1
-
-    return res if len(res) > 0 else -1
+    record = [[''] * (n2 + 1) for i in range(n1 + 1)]
+    s1 = ' ' + s1
+    s2 = ' ' + s2
+    for i in range(1, n1 + 1):
+        for j in range(1, n2 + 1):
+            if s1[i] == s2[j]:
+                record[i][j] = record[i - 1][j - 1] + s1[i]
+            else:
+                record[i][j] = record[i][j - 1] if len(record[i][j - 1]) >= len(record[i - 1][j]) else record[i - 1][j]
+    for l in record:
+        if len(max(l, key=len)) >= len(res):
+            res = max(l, key=len)
+    return res if res else '-1'
 
 s1 = "1a1a31"
 s2 = "1a231"

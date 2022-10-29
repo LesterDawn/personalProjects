@@ -16,6 +16,7 @@ from turtle import forward
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
+from scipy import stats
 writer = SummaryWriter('runs/multi-features-LSTM')
 # from torchvision import transforms, datasets
 pd.set_option('display.max_columns', 1000)
@@ -45,7 +46,7 @@ class Net(nn.Module):
         # h_out = h_out.view(-1, self.hidden_size)
         # out = self.fc(h_out)
 
-        # e.g.  x(10,3,100) 三个句子，十个单词，一百维的向量,nn.LSTM(input_size=100,hidden_size=20,num_layers=4)
+        # e.g.  x(10,3,100) e.g.三个句子，十个单词，一百维的向量,nn.LSTM(input_size=100,hidden_size=20,num_layers=4)
         # out.shape=(10,3,20) h/c.shape=(4,b,20)
         batch_size, seq_len = x.size()[0], x.size()[1]  # x.shape=(604,3,3)
         h_0 = torch.randn(self.num_directions * self.num_layers, x.size(0), self.hidden_size)
@@ -70,11 +71,14 @@ def pca_data(data):
 
 
 # 文件读取
-def get_data(data_path):
+def get_data(data_path, delete_outliers):
     data = pd.read_csv(data_path).dropna()
     attrs = ['叶绿素', '电导率', '溶解氧(mg/L)', '藻蛋白', '总溶解固体', '浊度', '温度', 'PH值']
-    data = data[attrs]  # 以13个特征作为数据
-    label = data['藻蛋白']  # 取最后一个特征作为标签
+    data = data[attrs]  # 8 features作为输入
+    label = data['藻蛋白']  # 藻蛋白作为target
+    if delete_outliers:
+        data_norm = (data - data.mean()) / (data.std())
+        data = data[abs(data_norm[:]) <= 3].dropna().reset_index(drop=True)
     print(data.head())
     print(label.head())
     return data, label
@@ -91,7 +95,7 @@ def normalization(data, label):
     return data, label, mm_y
 
 
-# 时间向量转换，步长为3
+# 时间向量转换，步长为3.极限为7
 def split_windows(data, seq_length):
     x = []
     y = []
@@ -196,20 +200,20 @@ input_size = 8
 num_layers = 6
 hidden_size = 12
 batch_size = 64
-n_iters = 5000
+n_iters = 10000
 lr = 0.001
 output_size = 1
 split_ratio = 1
 file_dir = './datasets/监测数据1/监测数据-独墅-20210929.csv'  # train
-file_dir_1 = './datasets/监测数据1/监测数据-独墅-20220927.csv'  # test
+file_dir_1 = './datasets/监测数据1/监测数据-独墅-20211029.csv'  # test
 
 model = Net(input_size, hidden_size, num_layers, output_size, batch_size, seq_length).cuda()
 criterion = torch.nn.MSELoss().cuda()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 print(model)
 # =================数据导入=================
-data, label = get_data(file_dir)
-data_t, label_t = get_data(file_dir_1)
+data, label = get_data(file_dir, True)
+data_t, label_t = get_data(file_dir_1, True)
 # pca 降维 10->9
 # data, pca_info, pca_var_ratio = pca_data(data)
 data, label, mm_y = normalization(data, label)

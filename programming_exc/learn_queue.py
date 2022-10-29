@@ -7,3 +7,4 @@ for i in range(5):
 
 while not q.empty():
     print(q.get())
+    print(q.qsize())

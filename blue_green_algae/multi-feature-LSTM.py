@@ -204,16 +204,16 @@ n_iters = 10000
 lr = 0.001
 output_size = 1
 split_ratio = 1
-file_dir = './datasets/监测数据1/监测数据-独墅-20210929.csv'  # train
-file_dir_1 = './datasets/监测数据1/监测数据-独墅-20211029.csv'  # test
+file_dir = './datasets/监测数据1/监测数据-独墅-20210901.csv'  # train
+file_dir_1 = './datasets/监测数据1/监测数据-独墅-20220906.csv'  # test
 
 model = Net(input_size, hidden_size, num_layers, output_size, batch_size, seq_length).cuda()
 criterion = torch.nn.MSELoss().cuda()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 print(model)
 # =================数据导入=================
-data, label = get_data(file_dir, True)
-data_t, label_t = get_data(file_dir_1, True)
+data, label = get_data(file_dir, False)
+data_t, label_t = get_data(file_dir_1, False)
 # pca 降维 10->9
 # data, pca_info, pca_var_ratio = pca_data(data)
 data, label, mm_y = normalization(data, label)

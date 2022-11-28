@@ -2,11 +2,13 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import r2_score
 import torch
 from torch import nn, optim
 from torch.autograd import Variable
@@ -16,7 +18,7 @@ from turtle import forward
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
-from scipy import stats
+
 writer = SummaryWriter('runs/multi-features-LSTM')
 # from torchvision import transforms, datasets
 pd.set_option('display.max_columns', 1000)
@@ -71,17 +73,29 @@ def pca_data(data):
 
 
 # 文件读取
-def get_data(data_path, delete_outliers):
+def get_data(data_path, outliers, filter):
     data = pd.read_csv(data_path).dropna()
     attrs = ['叶绿素', '电导率', '溶解氧(mg/L)', '藻蛋白', '总溶解固体', '浊度', '温度', 'PH值']
+    data['藻蛋白'] /= 100
     data = data[attrs]  # 8 features作为输入
     label = data['藻蛋白']  # 藻蛋白作为target
-    if delete_outliers:
-        data_norm = (data - data.mean()) / (data.std())
-        data = data[abs(data_norm[:]) <= 3].dropna().reset_index(drop=True)
+    if outliers:
+        data = delete_outliers(data, filter)
     print(data.head())
     print(label.head())
     return data, label
+
+
+def delete_outliers(data, filter):
+    if filter:
+        for attr in data.columns:
+            data[attr] = pd.DataFrame(savgol_filter(data[attr], window_length=11, polyorder=3))
+
+    data = data[data > 0].dropna()
+    data.reset_index(drop=True, inplace=True)
+    data_norm = (data - data.mean()) / (data.std())
+    data = data[abs(data_norm[:]) <= 3].dropna().reset_index(drop=True)
+    return data
 
 
 # 数据预处理，归一化
@@ -174,30 +188,39 @@ def loss_curve(loss_list, epoches):
 
 
 # 结果可视化
-def result(x_data, y_data):
-    model.eval()
-    train_predict = model(x_data)
+def result(x_data, y_data, train_or_test, step):
+    if step == 'single':
+        model.eval()
+        train_predict = model(x_data)
 
-    data_predict = train_predict.data.cpu().numpy()
-    y_data_plot = y_data.data.cpu().numpy()
-    y_data_plot = np.reshape(y_data_plot, (-1, 1))
-    data_predict = mm_y.inverse_transform(data_predict)
-    y_data_plot = mm_y.inverse_transform(y_data_plot)
+        data_predict = train_predict.data.cpu().numpy()
+        y_data_plot = y_data.data.cpu().numpy()
+        y_data_plot = np.reshape(y_data_plot, (-1, 1))
+        data_predict = mm_y.inverse_transform(data_predict)
+        y_data_plot = mm_y.inverse_transform(y_data_plot)
 
-    plt.plot(y_data_plot)
-    plt.plot(data_predict)
-    plt.legend(('real', 'predict'), fontsize='15')
-    plt.show()
+        plt.plot(y_data_plot)
+        plt.plot(data_predict)
+        plt.legend(('real', 'predict'), fontsize='15')
+        plt.title(train_or_test)
+        plt.show()
 
-    print('MAE/RMSE')
-    print(mean_absolute_error(y_data_plot, data_predict))
-    print(np.sqrt(mean_squared_error(y_data_plot, data_predict)))
+        print('MAE/RMSE')
+        print(mean_absolute_error(y_data_plot, data_predict))
+        print(np.sqrt(mean_squared_error(y_data_plot, data_predict)))
+        print('R2: %.3f' % r2_score(y_data_plot, data_predict))
+    if step == 'multi':
+        model.eval()
+        with torch.no_grad():
+            predictions, _ = model(x_data[-seq_length:], None)
+        # -- Apply inverse transform to undo scaling
+        predictions = MinMaxScaler().inverse_transform(np.array(predictions.reshape(-1, 1)))
 
 
 # ==============参数设置================
-seq_length = 3  # 时间步长
+seq_length = 10  # 时间步长
 input_size = 8
-num_layers = 6
+num_layers = 8
 hidden_size = 12
 batch_size = 64
 n_iters = 10000
@@ -205,21 +228,23 @@ lr = 0.001
 output_size = 1
 split_ratio = 1
 file_dir = './datasets/监测数据1/监测数据-独墅-20210901.csv'  # train
-file_dir_1 = './datasets/监测数据1/监测数据-独墅-20220906.csv'  # test
+file_dir_1 = './datasets/监测数据1/监测数据-独墅-20210918.csv'  # test
 
 model = Net(input_size, hidden_size, num_layers, output_size, batch_size, seq_length).cuda()
 criterion = torch.nn.MSELoss().cuda()
 optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 print(model)
 # =================数据导入=================
-data, label = get_data(file_dir, False)
-data_t, label_t = get_data(file_dir_1, False)
+data, label = get_data(file_dir, True, False)
+data_t, label_t = get_data(file_dir_1, True, False)
+# minibatch test
+# data_t, label_t = data_t[:100], label_t[:100]
 # pca 降维 10->9
 # data, pca_info, pca_var_ratio = pca_data(data)
-data, label, mm_y = normalization(data, label)
+data_norm, label_norm, mm_y = normalization(data, label)
 data_t, label_t, mm_y_t = normalization(data_t, label_t)
 
-x, y = split_windows(data, seq_length)
+x, y = split_windows(data_norm, seq_length)
 x1, y1 = split_windows(data_t, seq_length)
 x_data, y_data, x_train, y_train, x_test, y_test = split_data_1(x, y, x1, y1, split_ratio)
 train_loader, test_loader, num_epochs = data_generator(x_train.cuda(), y_train.cuda(),
@@ -246,7 +271,8 @@ for epoch in range(num_epochs):
             running_loss = 0.0
             print("iter: %d, loss: %1.5f" % (iter, loss.item()))
 print(x_data.shape)
-
+writer.add_graph(model, x_test)
+writer.close()
 # 结果可视化
-result(x_data.cpu(), y_data.cpu())
-result(x_test.cpu(), y_test.cpu())
+result(x_data.cpu(), y_data.cpu(), 'Train', 'single')
+result(x_test.cpu(), y_test.cpu(), 'Test', 'single')

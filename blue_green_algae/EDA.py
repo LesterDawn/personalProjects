@@ -37,7 +37,8 @@ def get_desc_stat(data, outlier, filter):
         ax.set_title(data.columns[i])
         for j in range(len(index)):
             plt.bar(index[j], data_describe.loc[index[j], data.columns[i]])
-    plt.show()
+    # plt.show()
+    plt.savefig('/home/weiyichen/桌面/EDA_shape-dushu_20210901.png')
     return data
 
 
@@ -51,6 +52,7 @@ def delete_outliers(data, filter):
 
     data_norm = (data - data.mean()) / (data.std())
     data = data[abs(data_norm[:]) <= 3].dropna().reset_index(drop=True)
+    plt.savefig('/home/weiyichen/桌面/EDA_dist-dushu_20210901.png')
     return data
 
 

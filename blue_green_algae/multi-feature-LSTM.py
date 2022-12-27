@@ -76,8 +76,6 @@ def pca_data(data):
 # 文件读取
 def get_data(data_path, outliers, filter):
     data = pd.read_csv(data_path).dropna()
-    print(file)
-    print(data.shape)
     # attrs = ['叶绿素', '电导率', '溶解氧(mg/L)', '藻蛋白', '总溶解固体', '浊度', '温度', 'PH值']
     # data['藻蛋白'] /= 100
     # data = data[attrs]  # 8 features作为输入

@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 from scipy.signal import savgol_filter
 from sklearn import preprocessing
 from sklearn.decomposition import PCA
@@ -75,15 +76,28 @@ def pca_data(data):
 # 文件读取
 def get_data(data_path, outliers, filter):
     data = pd.read_csv(data_path).dropna()
-    attrs = ['叶绿素', '电导率', '溶解氧(mg/L)', '藻蛋白', '总溶解固体', '浊度', '温度', 'PH值']
-    data['藻蛋白'] /= 100
-    data = data[attrs]  # 8 features作为输入
-    label = data['藻蛋白']  # 藻蛋白作为target
+    # attrs = ['叶绿素', '电导率', '溶解氧(mg/L)', '藻蛋白', '总溶解固体', '浊度', '温度', 'PH值']
+    # data['藻蛋白'] /= 100
+    # data = data[attrs]  # 8 features作为输入
+    # label = data['藻蛋白']  # 藻蛋白作为target
+    attrs = ['时间', '叶绿素', '电导率', '溶解氧(mg/L)', '藻蛋白', '总溶解固体', '浊度', '温度', 'PH值']
+    data = data[attrs]
+
+    data.rename(columns={'时间': 'time', '叶绿素': 'Chlo', '电导率': 'Cond',
+                         '溶解氧(mg/L)': 'DO', '藻蛋白': 'Phyco',
+                         '总溶解固体': 'TDS', '浊度': 'Turb',
+                         '温度': 'Temp', 'PH值': 'pH'
+                         }, inplace=True)
+    data['time'] = pd.to_datetime(data['time'])
+    data['Phyco'] /= 100
+    data = data.sort_values('time')
+    data.reset_index(drop=True, inplace=True)
+    data = data.drop('time', axis=1)
     if outliers:
         data = delete_outliers(data, filter)
     print(data.head())
-    print(label.head())
-    return data, label
+    #print(label.head())
+    return data, 1#, label
 
 
 def delete_outliers(data, filter):
@@ -250,12 +264,19 @@ files = os.listdir(root_dir)
 d_2022 = []
 j_2022 = []
 matrices = []
-for file in files:
-    if file.__contains__('独墅-2022'):
-        d_2022.append(file)
-    elif file.__contains__('金鸡-2022'):
-        j_2022.append(file)
-d_2022, j_2022 = sorted(d_2022), sorted(j_2022)
+# for file in files:  # get correlation matrix
+#     data, _ = get_data(root_dir+file, True, False)
+#     sns.heatmap(data.corr(), annot=True, linewidths=0.2)  # data.corr()-->correlation matrix
+#     fig = plt.gcf()
+#     fig.set_size_inches(10, 8)
+#     plt.title(file.split('.')[0])
+#     plt.savefig('/home/weiyichen/桌面/correlations/%s.png' % file.split('.')[0])
+#     plt.close()
+#     if file.__contains__('独墅-2022'):
+#         d_2022.append(file)
+#     elif file.__contains__('金鸡-2022'):
+#         j_2022.append(file)
+# d_2022, j_2022 = sorted(d_2022), sorted(j_2022)
 
 for j in range(0, len(j_2022) - 1, 2):
     file_dir = root_dir + j_2022[j]  # train
@@ -310,57 +331,3 @@ for j in range(0, len(j_2022) - 1, 2):
     mae_test, rmse_test, r2_test, _ = result(x_test.cpu(), y_test.cpu(), 'Test', 'single', True)
     matrices.append([col_name, mae_train, rmse_train, r2_train, mae_test, rmse_test, r2_test])
 pd.DataFrame(matrices).to_csv('/home/weiyichen/桌面/j_2022_performance.csv', index=False)
-
-"""
-result of model training and testing
-使用带有离群点的数据集的模型训练和测试结果。对每张图，蓝色曲线代表实际值，橙色曲线代表预测值。纵轴为Phyco的值，横轴为样本的index。
-从左至右，每两个子图为一组训练与测试数据，例如Figure 10(a)与Figure 10(b)，(a)为模型训练结果而(b)为测试结果。
-
-在本节，LSTM模型的训练和测试结果以Phyco的实际值与预测值的曲线图的形式展示。两条曲线的对比可以很好地显示模型对Phyco变化趋势的学习和
-预测。另外，结果分为 使用带有离群点的数据集的模型训练和测试结果 和 使用已删除有离群点的数据集的模型训练和测试结果。通过比较，可以发现
-离群值对模型训练与测试的影响。对于训练集和测试集的选用，我们使用相邻两个日期的数据分别作为训练集和测试集，而不是在一个日期的数据集上划分
-训练集和测试集，这样可以更好地反映模型的泛化能力。训练和测试方案如表5所示。
-
-从整体上看，训练效果比较满意。预测曲线与实际值曲线在变化趋势上比较贴合，但模型对数值的准确性存在一定的误差。详细来说，模型将一段具有峰值变化的序列预测
-为数值相近的序列，这种现象在每个数据集上都有所体现，其中在Figure 10(k)的训练集中最为明显。测试集的表现不尽人意。除了图10(h), (j)和(p)
-外，不论是趋势还是精确程度，其余数据集的预测曲线与实际值曲线差异很大，这说明模型存在欠拟合。Figure 10(b)和(f)的预测曲线是最欠拟合的。不仅没有预测出
-可容忍的数值，也没有反映出实际序列的趋势，其中的原因可能是受离群值的影响，也可能是模型参数设置还需优化。
-
-图11是独墅湖的删除离群值的数据的训练与测试结果。与图10类似，整体的训练效果比较令人满意。与图10中的训练结果相比，预测曲线与实际值曲线在变化趋势上更贴合。
-尽管模型对数值的准确性存在一定的误差，但比图10中的误差要小一些。将一段具有峰值变化的序列预测为数值相近的序列这中现象也存在于所有数据集中，但Figure 11(k)
-的训练集与Figure 10(k)相比有所改善。测试方面，测试的预测曲线比Figure 10中更加贴合实际值曲线。除Figure 11(f)外，其余子图的预测曲线都能反映
-实际值曲线的趋势，但数值精确度依旧不能令人满意。
-
-对于金鸡湖，与独墅湖类似，对序列变化趋势和数值精确度反映了还算满意的训练效果，而且模型也存在未学习到变化的现象，但独墅湖的程度小。看上去金鸡湖的训练拟合效果更好。
-然而，金鸡湖的训练效果看上去更难以接受。仅从Figure 12中看，似乎没有一个测试集被预测了出来，Figure 12(h), (l)和(n)的预测效果是最差的。
-尤其是Figure 12(h)甚至将测试数据预测为一条近乎平滑的直线。
-
-删除离群值后(Figure 13)，训练效果有了轻微的提升，但测试效果有了显著的提升。尽管预测的数值看上去与实际值曲线存在一些差异，但模型几乎每个数据集的变化趋势
-都预测了出来，除了Figure 13(f)外。预测数据中，改善最明显的是Figure 13(h), (l)和(n)。与Figure 12(h), (l)和(n)相比，趋势得到了良好的预测，而且
-数值的差异程度也可以接受得多。
-
-performance measurement
-本节从几个metrics来衡量模型的表现，即MAE, RMSE和R2。MAE和RMSE用于反映模型拟合的误差，其数值越小说明误差越；R2用于衡量模型拟合的goodness，若出现负值
-说明模型在训练集上不适用。Performance measurement同样使用了对比的方法，比较了模型在未处理离群值的数据集和处理了离群值的数据集上的metrics。
-
-模型的performance measurement在表6-9中显示。每张表都包含相同的attributes：训练和测试的MAE，RMSE和R2，以及Datasets。To illustrate, Datasets
-表示模型训练和测试所用的两个数据集，例如dushu-20220522_20220610 代表该模型使用了独墅湖20220522的数据作为训练集，使用了独墅湖20220610的数据作为测试集。
-
-首先来查看独墅湖的结果。对于模型的误差（MAE和RMSE），整体上，用删除离群值数据集的模型训练误差比未删除离群值的模型小，前者的MAE和RMSE的和分别为26.351和34.58，
-而后者为32.395和41.895。MAE和RMSE的提升分别为23.8\%和17.5\%。对于测试误差亦是如此，用删除离群值数据集的模型，测试的MAE和RMSE之和分别为38.086和47.823；
-未删除离群值的模型为47.442和58.663。提升分别为20.4\%和19.1\%。MAE和RMSE的结果说明删除离群值可以在一定程度上降低模型的误差，提高模型精确度。
-
-下一步查看模型拟合的好坏(R2)。对于有离群值的数据集和没有离群值的数据集，模型训练的R2相差不大，无离群值的模型的R2整体上稍微大一点。在模型测试的R2方面
-使用不同数据集的模型差别很大。对于没有离群值的数据集，有两个R2为负数(-1.367和-2.541)，说明模型的goodness of fit非常差，and 
-the model is predicting worse than the mean of the target values. 从Figure 10(b)和(d)中也可以看出模型的poor performance。另外还有
-两个R2值低于0.5(0.319和0.387)，分别对应Figure 10(f)和(l)。
-
-首先来查看独墅湖的结果。对于模型的误差（MAE和RMSE），整体上，用删除离群值数据集的模型训练误差比未删除离群值的模型小，前者的MAE和RMSE的和分别为26.351和34.58，
-而后者为32.395和41.895。MAE和RMSE的提升分别为23.8\%和17.5\%。对于测试误差亦是如此，用删除离群值数据集的模型，测试的MAE和RMSE之和分别为38.086和47.823；
-未删除离群值的模型为47.442和58.663。提升分别为20.4\%和19.1\%。MAE和RMSE的结果说明删除离群值可以在一定程度上降低模型的误差，提高模型精确度。
-
-下一步查看模型拟合的好坏(R2)。对于有离群值的数据集和没有离群值的数据集，模型训练的R2相差不大，无离群值的模型的R2整体上稍微大一点。在模型测试的R2方面
-使用不同数据集的模型差别很大。对于没有离群值的数据集，有两个R2为负数(-1.367和-2.541)，说明模型的goodness of fit非常差，and 
-the model is predicting worse than the mean of the target values. 从Figure 10(b)和(d)中也可以看出模型的poor performance。另外还有
-两个R2值低于0.5(0.319和0.387)，分别对应Figure 10(f)和(l)。
-"""
